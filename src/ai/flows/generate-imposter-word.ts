@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI, GoogleAIGeminiModel } from '@genkit-ai/googleai';
 import {z} from 'genkit';
 
 const GenerateImposterWordInputSchema = z.object({
@@ -16,6 +16,7 @@ const GenerateImposterWordInputSchema = z.object({
   difficulty: z
     .enum(['easy', 'medium', 'hard'])
     .describe('Der Schwierigkeitsgrad für das Imposter-Wort und den Hinweis.'),
+  model: z.enum(['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest']).describe('Das zu verwendende KI-Modell.'),
 });
 export type GenerateImposterWordInput = z.infer<typeof GenerateImposterWordInputSchema>;
 
@@ -31,12 +32,21 @@ export async function generateImposterWord(
   return generateImposterWordFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'generateImposterWordPrompt',
-  input: {schema: GenerateImposterWordInputSchema},
-  output: {schema: GenerateImposterWordOutputSchema},
-  model: googleAI.model('gemini-1.5-flash-latest'),
-  prompt: `Du bist ein Imposter-Wortgenerator. Deine Aufgabe ist es, ein geheimes Wort (imposterWord) und ein einzelnes Hilfswort (hint) zu generieren, basierend auf einer Kategorie und einem Schwierigkeitsgrad. Beide Wörter müssen auf Deutsch sein. Das Hilfswort ist für den Imposter bestimmt, damit dieser eine Chance hat, das geheime Wort zu erraten oder seine Rolle zu verschleiern.
+const generateImposterWordFlow = ai.defineFlow(
+  {
+    name: 'generateImposterWordFlow',
+    inputSchema: GenerateImposterWordInputSchema,
+    outputSchema: GenerateImposterWordOutputSchema,
+  },
+  async (input) => {
+    const { category, difficulty, model } = input;
+
+    const prompt = ai.definePrompt({
+      name: 'generateImposterWordPrompt',
+      input: { schema: GenerateImposterWordInputSchema },
+      output: { schema: GenerateImposterWordOutputSchema },
+      model: googleAI.model(model as GoogleAIGeminiModel),
+      prompt: `Du bist ein Imposter-Wortgenerator. Deine Aufgabe ist es, ein geheimes Wort (imposterWord) und ein einzelnes Hilfswort (hint) zu generieren, basierend auf einer Kategorie und einem Schwierigkeitsgrad. Beide Wörter müssen auf Deutsch sein. Das Hilfswort ist für den Imposter bestimmt, damit dieser eine Chance hat, das geheime Wort zu erraten oder seine Rolle zu verschleiern.
 
 Kategorie: {{{category}}}
 Schwierigkeitsgrad: {{{difficulty}}}
@@ -53,16 +63,9 @@ Beispiel:
 
 Gib das Imposter-Wort und das Hilfswort als JSON-Objekt mit den Feldern "imposterWord" und "hint" aus.
 `,
-});
-
-const generateImposterWordFlow = ai.defineFlow(
-  {
-    name: 'generateImposterWordFlow',
-    inputSchema: GenerateImposterWordInputSchema,
-    outputSchema: GenerateImposterWordOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
+    });
+    
+    const { output } = await prompt(input);
     return output!;
   }
 );

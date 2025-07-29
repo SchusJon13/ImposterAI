@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Smile, Meh, Frown, Wand2, ArrowRight, UserPlus, Trash2, Copy, Users, Crown } from "lucide-react";
+import { Loader2, Smile, Meh, Frown, Wand2, ArrowRight, UserPlus, Trash2, Copy, Users, Crown, Bot } from "lucide-react";
 import Link from 'next/link';
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getImposterWordAction } from "@/app/actions";
 import type { GenerateImposterWordOutput } from "@/ai/flows/generate-imposter-word";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const formSchema = z.object({
   category: z.string().min(2, {
@@ -33,12 +34,18 @@ const formSchema = z.object({
   difficulty: z.enum(["easy", "medium", "hard"], {
     required_error: "Du musst einen Schwierigkeitsgrad auswählen.",
   }),
+  model: z.enum(["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]),
 });
 
 const difficultyOptions = [
   { value: "easy", label: "Leicht", icon: Smile },
   { value: "medium", label: "Mittel", icon: Meh },
   { value: "hard", label: "Schwer", icon: Frown },
+] as const;
+
+const modelOptions = [
+    { value: "gemini-1.5-flash-latest", label: "Gemini 1.5 Flash (Schnell)" },
+    { value: "gemini-1.5-pro-latest", label: "Gemini 1.5 Pro (Stark)" },
 ] as const;
 
 interface Player {
@@ -74,7 +81,6 @@ export function ImposterForm() {
       }
       setGameMasterId(gmId);
       
-      // Add the Game Master to the players list if not already there
       const playersList = savedPlayers ? JSON.parse(savedPlayers) : [];
       const gameMasterPlayer = playersList.find((p: Player) => p.id === gmId);
       if (!gameMasterPlayer) {
@@ -94,6 +100,7 @@ export function ImposterForm() {
     defaultValues: {
       category: "",
       difficulty: "medium",
+      model: "gemini-1.5-flash-latest",
     },
   });
 
@@ -274,11 +281,11 @@ export function ImposterForm() {
         <Card>
           <CardHeader>
               <CardTitle>Spieleinstellungen</CardTitle>
-              <CardDescription>Wähle eine Kategorie und einen Schwierigkeitsgrad.</CardDescription>
+              <CardDescription>Wähle eine Kategorie, einen Schwierigkeitsgrad und ein KI-Modell.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
                   name="category"
@@ -325,6 +332,32 @@ export function ImposterForm() {
                     </FormItem>
                   )}
                 />
+                
+                <FormField
+                  control={form.control}
+                  name="model"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2"><Bot /> KI-Modell</FormLabel>
+                       <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Wähle ein KI-Modell" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {modelOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
               </form>
             </Form>
           </CardContent>
