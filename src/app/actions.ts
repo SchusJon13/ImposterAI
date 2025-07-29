@@ -15,7 +15,6 @@ export async function getImposterWordAction(values: GenerateImposterWordInput): 
 }> {
   const validation = ImposterFormSchema.safeParse(values);
   if (!validation.success) {
-    // Collect all validation errors
     const errorMessages = validation.error.errors.map(e => e.message).join(', ');
     return { data: null, error: `Ungültige Eingabe: ${errorMessages}` };
   }
@@ -25,7 +24,6 @@ export async function getImposterWordAction(values: GenerateImposterWordInput): 
     return { data: result, error: null };
   } catch (error) {
     console.error("Error in getImposterWordAction:", error);
-    // Provide a more specific error message
     const errorMessage = error instanceof Error ? error.message : String(error);
     return { data: null, error: `Beim Generieren des Wortes ist ein Fehler aufgetreten. (Details: ${errorMessage})` };
   }
