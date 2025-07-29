@@ -35,7 +35,7 @@ const prompt = ai.definePrompt({
   name: 'generateImposterWordPrompt',
   input: {schema: GenerateImposterWordInputSchema},
   output: {schema: GenerateImposterWordOutputSchema},
-  model: googleAI.model('gemini-1.5-pro-latest'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   prompt: `Du bist ein Imposter-Wortgenerator. Deine Aufgabe ist es, ein geheimes Wort (imposterWord) und ein einzelnes Hilfswort (hint) zu generieren, basierend auf einer Kategorie und einem Schwierigkeitsgrad. Beide Wörter müssen auf Deutsch sein. Das Hilfswort ist für den Imposter bestimmt, damit dieser eine Chance hat, das geheime Wort zu erraten oder seine Rolle zu verschleiern.
 
 Kategorie: {{{category}}}
