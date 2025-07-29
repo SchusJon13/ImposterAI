@@ -15,14 +15,18 @@ export async function getImposterWordAction(values: GenerateImposterWordInput): 
 }> {
   const validation = ImposterFormSchema.safeParse(values);
   if (!validation.success) {
-    return { data: null, error: 'Ungültige Eingabe. Bitte überprüfe das Formular und versuche es erneut.' };
+    // Collect all validation errors
+    const errorMessages = validation.error.errors.map(e => e.message).join(', ');
+    return { data: null, error: `Ungültige Eingabe: ${errorMessages}` };
   }
 
   try {
     const result = await generateImposterWord(validation.data);
     return { data: result, error: null };
   } catch (error) {
-    console.error("Error generating imposter word:", error);
-    return { data: null, error: "Beim Generieren des Wortes ist ein unbekannter Fehler aufgetreten." };
+    console.error("Error in getImposterWordAction:", error);
+    // Provide a more specific error message
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { data: null, error: `Beim Generieren des Wortes ist ein Fehler aufgetreten. (Details: ${errorMessage})` };
   }
 }
