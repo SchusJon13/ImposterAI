@@ -23,6 +23,6 @@ export async function getImposterWordAction(values: GenerateImposterWordInput): 
     return { data: result, error: null };
   } catch (error) {
     console.error("Error generating imposter word:", error);
-    return { data: null, error: "Beim Generieren des Wortes ist ein unerwarteter Fehler aufgetreten. Bitte versuche es später erneut." };
+    return { data: null, error: "Beim Generieren des Wortes ist ein unbekannter Fehler aufgetreten." };
   }
 }
