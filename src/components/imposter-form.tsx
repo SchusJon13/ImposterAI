@@ -221,10 +221,8 @@ export function ImposterForm() {
               </CardContent>
               <CardFooter className="flex-col gap-4 p-6 bg-muted/50">
                 <Link href={gameUrl} passHref className="w-full">
-                  <Button asChild className="w-full">
-                    <a>
-                      Zum Spiel beitreten <ArrowRight className="ml-2 h-4 w-4" />
-                    </a>
+                  <Button className="w-full">
+                    Zum Spiel beitreten <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
                 <Button variant="outline" onClick={handleStartOver} className="w-full">
@@ -345,5 +343,3 @@ export function ImposterForm() {
     </>
   );
 }
-
-    
