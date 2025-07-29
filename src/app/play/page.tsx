@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { getFirestore, doc, onSnapshot } from "firebase/firestore";
 import { getApp, getApps, initializeApp } from 'firebase/app';
 
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
@@ -54,6 +54,7 @@ function PlayPageContent() {
 
         const gameDocRef = doc(db, 'games', gameId);
 
+        // Use onSnapshot for real-time updates!
         const unsubscribe = onSnapshot(gameDocRef, (docSnap) => {
             if (docSnap.exists()) {
                 setGameState(docSnap.data() as GameState);
@@ -122,6 +123,7 @@ function PlayPageContent() {
                 description: error || 'Das Spiel konnte nicht beendet werden.',
             });
         }
+        // No need to manually update state, onSnapshot will handle it.
     };
 
     const handleNewGame = () => {
@@ -293,7 +295,7 @@ function PlayPageContent() {
                                     <Swords className="mr-2" /> Spiel beenden & Wort aufdecken
                                 </Button>
                             )}
-                             <Button variant="secondary" onClick={() => { setCurrentPlayer(null); setIsCardFlipped(false); setPlayerIdInput(''); localStorage.removeItem(`imposter-last-player-${gameId}`); }}>
+                             <Button variant="secondary" onClick={() => { setCurrentPlayer(null); setIsCardFlipped(false); setPlayerIdInput(''); if (gameId) localStorage.removeItem(`imposter-last-player-${gameId}`); }}>
                                 Anderer Spieler
                             </Button>
                             <Button variant="outline" onClick={handleNewGame} className="w-full">
@@ -314,3 +316,5 @@ export default function PlayPage() {
     </Suspense>
   )
 }
+
+    
