@@ -37,7 +37,7 @@ const aiFormSchema = z.object({
   difficulty: z.enum(["easy", "medium", "hard"], {
     required_error: "Du musst einen Schwierigkeitsgrad auswählen.",
   }),
-  model: z.enum(["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.0-pro"]),
+  model: z.enum(["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]),
 });
 
 const debugFormSchema = z.object({
@@ -57,7 +57,6 @@ const difficultyOptions = [
 const modelOptions = [
     { value: "gemini-1.5-flash-latest", label: "Gemini 1.5 Flash (Schnell)" },
     { value: "gemini-1.5-pro-latest", label: "Gemini 1.5 Pro (Stark)" },
-    { value: "gemini-1.0-pro", label: "Gemini 1.0 Pro (Stabil)" },
 ] as const;
 
 interface Player {
