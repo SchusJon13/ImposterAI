@@ -20,7 +20,7 @@ export type GenerateImposterWordInput = z.infer<typeof GenerateImposterWordInput
 
 const GenerateImposterWordOutputSchema = z.object({
   imposterWord: z.string().describe('Das generierte Imposter-Wort.'),
-  hint: z.string().optional().describe('Ein Hinweis für das Imposter-Wort.'),
+  hint: z.string().optional().describe('Ein Hilfswort für das Imposter-Wort.'),
 });
 export type GenerateImposterWordOutput = z.infer<typeof GenerateImposterWordOutputSchema>;
 
@@ -34,21 +34,26 @@ const prompt = ai.definePrompt({
   name: 'generateImposterWordPrompt',
   input: {schema: GenerateImposterWordInputSchema},
   output: {schema: GenerateImposterWordOutputSchema},
-  prompt: `Du bist ein Imposter-Wortgenerator. Du generierst ein Imposter-Wort und einen Hinweis basierend auf der Kategorie und dem Schwierigkeitsgrad. Die Wörter und Hinweise müssen auf Deutsch sein.
+  prompt: `Du bist ein Imposter-Wortgenerator. Deine Aufgabe ist es, ein geheimes Wort (imposterWord) und ein einzelnes Hilfswort (hint) zu generieren, basierend auf einer Kategorie und einem Schwierigkeitsgrad. Beide Wörter müssen auf Deutsch sein. Das Hilfswort ist für den Imposter bestimmt, damit dieser eine Chance hat, das geheime Wort zu erraten oder seine Rolle zu verschleiern.
 
 Kategorie: {{{category}}}
 Schwierigkeitsgrad: {{{difficulty}}}
 
 Schwierigkeitsgrade:
-- Leicht: Das Imposter-Wort ist ein gebräuchliches Wort, das mit der Kategorie zusammenhängt, und der Hinweis ist eine kurze Definition oder ein Beispiel für das Wort.
-- Mittel: Das Imposter-Wort ist ein weniger gebräuchliches Wort, das mit der Kategorie zusammenhängt, und der Hinweis ist eine detailliertere Definition oder ein Beispiel für das Wort.
-- Schwer: Das Imposter-Wort ist ein seltenes oder obskures Wort, das mit der Kategorie zusammenhängt, und der Hinweis ist ein kryptischer Anhaltspunkt oder eine Assoziation.
+- Leicht: Das Imposter-Wort ist ein gebräuchliches Wort. Das Hilfswort ist ein sehr naher Verwandter oder ein Oberbegriff.
+- Mittel: Das Imposter-Wort ist etwas spezifischer. Das Hilfswort ist ein verwandtes Wort, aber nicht zu offensichtlich.
+- Schwer: Das Imposter-Wort ist selten oder spezifisch. Das Hilfswort ist nur vage oder durch Assoziation mit dem Imposter-Wort verbunden.
 
-Gib das Imposter-Wort und den Hinweis als JSON-Objekt mit den Feldern "imposterWord" und "hint" aus. Das Feld "hint" ist optional und kann leer gelassen werden.
+Beispiel:
+- Kategorie: "Obst", Schwierigkeitsgrad: "Leicht"
+- Mögliches Imposter-Wort: "Apfel"
+- Mögliches Hilfswort: "Frucht"
+
+Gib das Imposter-Wort und das Hilfswort als JSON-Objekt mit den Feldern "imposterWord" und "hint" aus.
 
 {
   "imposterWord": "<imposter_wort>",
-  "hint": "<hinweis>"
+  "hint": "<hilfswort>"
 }
 `,
 });
