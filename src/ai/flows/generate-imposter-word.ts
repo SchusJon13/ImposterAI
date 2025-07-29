@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Generates an imposter word and hint based on a category and difficulty level.
@@ -16,7 +17,7 @@ const GenerateImposterWordInputSchema = z.object({
   difficulty: z
     .enum(['easy', 'medium', 'hard'])
     .describe('Der Schwierigkeitsgrad für das Imposter-Wort und den Hinweis.'),
-  model: z.enum(['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest']).describe('Das zu verwendende KI-Modell.'),
+  model: z.enum(['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-1.0-pro']).describe('Das zu verwendende KI-Modell.'),
 });
 export type GenerateImposterWordInput = z.infer<typeof GenerateImposterWordInputSchema>;
 

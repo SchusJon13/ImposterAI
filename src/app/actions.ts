@@ -7,7 +7,7 @@ import { z } from "zod";
 const ImposterFormSchema = z.object({
   category: z.string().min(2, 'Die Kategorie muss mindestens 2 Zeichen lang sein.'),
   difficulty: z.enum(['easy', 'medium', 'hard']),
-  model: z.enum(['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest']),
+  model: z.enum(['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-1.0-pro']),
 });
 
 export async function getImposterWordAction(values: GenerateImposterWordInput): Promise<{
