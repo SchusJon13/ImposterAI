@@ -221,7 +221,7 @@ export function ImposterForm() {
               </CardContent>
               <CardFooter className="flex-col gap-4 p-6 bg-muted/50">
                 <Link href={gameUrl} passHref className="w-full">
-                  <Button className="w-full">
+                  <Button className="w-full" size="lg">
                     Zum Spiel beitreten <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
@@ -329,11 +329,11 @@ export function ImposterForm() {
             </Form>
           </CardContent>
            <CardFooter>
-             <Button onClick={form.handleSubmit(onSubmit)} disabled={isLoading} className="w-full text-lg py-6">
+             <Button onClick={form.handleSubmit(onSubmit)} disabled={isLoading} className="w-full" size="lg">
                 {isLoading ? (
-                  <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                 ) : (
-                  <Wand2 className="mr-2 h-6 w-6" />
+                  <Wand2 className="mr-2 h-5 w-5" />
                 )}
                 Wort generieren & Spiel starten
               </Button>
