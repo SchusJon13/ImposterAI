@@ -2,7 +2,7 @@
 // src/app/play/page.tsx
 "use client";
 
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -20,50 +20,39 @@ interface Player {
     name: string;
 }
 
+interface GameState {
+    imposterWord: string;
+    hint: string;
+    imposterId: string;
+    players: Player[];
+    gameMasterId: string;
+    startingPlayerId: string;
+    isGameOver: boolean;
+}
+
 function PlayPageContent() {
-    const searchParams = useSearchParams();
     const router = useRouter();
     const { toast } = useToast();
 
-    const [imposterWord, setImposterWord] = useState('');
-    const [hint, setHint] = useState('');
-    const [imposterId, setImposterId] = useState('');
-    const [players, setPlayers] = useState<Player[]>([]);
-    const [gameMasterId, setGameMasterId] = useState('');
-    const [startingPlayerId, setStartingPlayerId] = useState('');
-    const [isGameOver, setIsGameOver] = useState(false);
-
+    const [gameState, setGameState] = useState<GameState | null>(null);
     const [playerIdInput, setPlayerIdInput] = useState('');
     const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
     const [isCardFlipped, setIsCardFlipped] = useState(false);
     
     useEffect(() => {
         try {
-            const word = searchParams.get('word') || '';
-            const hintParam = searchParams.get('hint') || '';
-            const imposterIdParam = searchParams.get('imposterId') || '';
-            const playersParam = searchParams.get('players');
-            const gameMasterIdParam = searchParams.get('gameMasterId') || '';
-            const startingPlayerIdParam = searchParams.get('startingPlayerId') || '';
-            const gameOverParam = searchParams.get('gameOver') === 'true';
-
-            if (!word || !imposterIdParam || !playersParam || !gameMasterIdParam || !startingPlayerIdParam) {
-                toast({
+            const storedGameState = localStorage.getItem('imposter-game-state');
+            if (!storedGameState) {
+                 toast({
                     variant: 'destructive',
                     title: 'Fehler',
-                    description: 'Spiel-URL ist unvollständig. Bitte starte ein neues Spiel.',
+                    description: 'Kein aktives Spiel gefunden. Bitte starte ein neues Spiel von der Hauptseite.',
                 });
                 router.push('/');
                 return;
             }
-
-            setImposterWord(word);
-            setHint(hintParam);
-            setImposterId(imposterIdParam);
-            setPlayers(JSON.parse(playersParam));
-            setGameMasterId(gameMasterIdParam);
-            setStartingPlayerId(startingPlayerIdParam);
-            setIsGameOver(gameOverParam);
+            const parsedState: GameState = JSON.parse(storedGameState);
+            setGameState(parsedState);
 
         } catch (error) {
             toast({
@@ -73,11 +62,12 @@ function PlayPageContent() {
             });
             router.push('/');
         }
-    }, [searchParams, router, toast]);
+    }, [router, toast]);
 
     const handleIdSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const foundPlayer = players.find(p => p.id.toLowerCase() === playerIdInput.toLowerCase());
+        if (!gameState) return;
+        const foundPlayer = gameState.players.find(p => p.id.toLowerCase() === playerIdInput.toLowerCase());
         if (foundPlayer) {
             setCurrentPlayer(foundPlayer);
         } else {
@@ -94,10 +84,28 @@ function PlayPageContent() {
     };
     
     const handleEndGame = () => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set('gameOver', 'true');
-        router.push(`/play?${params.toString()}`);
+        if (!gameState) return;
+        const updatedGameState = { ...gameState, isGameOver: true };
+        setGameState(updatedGameState);
+        localStorage.setItem('imposter-game-state', JSON.stringify(updatedGameState));
     };
+
+    const handleNewGame = () => {
+        localStorage.removeItem('imposter-game-state');
+        router.push('/');
+    };
+
+    if (!gameState) {
+        return (
+             <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-background">
+                <Card className="w-full max-w-sm shadow-xl">
+                    <CardHeader>
+                        <CardTitle className="text-center text-2xl">Lade Spiel...</CardTitle>
+                    </CardHeader>
+                </Card>
+            </main>
+        )
+    }
 
     if (!currentPlayer) {
         return (
@@ -117,6 +125,7 @@ function PlayPageContent() {
                                     placeholder="6-stellige ID"
                                     maxLength={6}
                                     className="text-center text-lg tracking-widest"
+                                    autoFocus
                                 />
                             </div>
                             <Button type="submit" className="w-full">
@@ -129,18 +138,18 @@ function PlayPageContent() {
         );
     }
     
-    const isImposter = currentPlayer.id === imposterId;
-    const isGameMaster = currentPlayer.id === gameMasterId;
-    const isStartingPlayer = currentPlayer.id === startingPlayerId;
+    const isImposter = currentPlayer.id === gameState.imposterId;
+    const isGameMaster = currentPlayer.id === gameState.gameMasterId;
+    const isStartingPlayer = currentPlayer.id === gameState.startingPlayerId;
 
     const role = isImposter ? "Imposter" : "Crewmate";
-    const textToShow = isImposter ? hint : imposterWord;
+    const textToShow = isImposter ? gameState.hint : gameState.imposterWord;
     const roleDescription = isImposter
         ? "Du bist der Imposter! Dein Ziel ist es, nicht entlarvt zu werden. Benutze den Hinweis, um so zu tun, als wüsstest du das geheime Wort."
         : "Du bist ein Crewmate! Das geheime Wort ist unten angezeigt. Finde heraus, wer der Imposter ist.";
 
-    if (isGameOver) {
-        const imposterPlayer = players.find(p => p.id === imposterId);
+    if (gameState.isGameOver) {
+        const imposterPlayer = gameState.players.find(p => p.id === gameState.imposterId);
         return (
             <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-background">
                 <Card className="w-full max-w-md text-center animate-in fade-in-0 duration-700 shadow-2xl">
@@ -152,14 +161,12 @@ function PlayPageContent() {
                         <div>
                             <p className="text-sm font-bold tracking-wider uppercase text-muted-foreground">Das geheime Wort war</p>
                             <p className="text-4xl font-extrabold text-primary tracking-wider uppercase drop-shadow-sm break-words">
-                                {imposterWord}
+                                {gameState.imposterWord}
                             </p>
                         </div>
                     </CardContent>
                     <CardFooter className="flex-col gap-2">
-                        <Link href="/" passHref className="w-full">
-                            <Button className="w-full">Neues Spiel starten</Button>
-                        </Link>
+                         <Button className="w-full" onClick={handleNewGame}>Neues Spiel starten</Button>
                     </CardFooter>
                 </Card>
             </main>
@@ -202,7 +209,7 @@ function PlayPageContent() {
                         <CardContent className="text-center p-8 min-h-[14rem] flex flex-col justify-center">
                             <p className="text-muted-foreground mb-4">{roleDescription}</p>
                             
-                            {isImposter && hint && (
+                            {isImposter && gameState.hint && (
                                 <>
                                     <Separator className="my-4"/>
                                     <h3 className="text-sm font-bold tracking-wider uppercase text-muted-foreground">Dein Hilfswort</h3>
@@ -231,11 +238,9 @@ function PlayPageContent() {
                             <Button variant="secondary" onClick={() => { setCurrentPlayer(null); setIsCardFlipped(false); setPlayerIdInput(''); }}>
                                 Anderer Spieler
                             </Button>
-                            <Link href="/" passHref className="w-full">
-                                <Button variant="outline" className="w-full">
-                                    Neues Spiel
-                                </Button>
-                            </Link>
+                            <Button variant="outline" onClick={handleNewGame} className="w-full">
+                                Neues Spiel
+                            </Button>
                         </CardFooter>
                     </Card>
                 )}
@@ -246,6 +251,8 @@ function PlayPageContent() {
 
 export default function PlayPage() {
   return (
+    // Suspense is not strictly needed here anymore since we are not using searchParams for initial state,
+    // but it's good practice to keep it for potential future async operations on page load.
     <Suspense fallback={<div>Laden...</div>}>
       <PlayPageContent />
     </Suspense>
