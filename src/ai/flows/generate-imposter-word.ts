@@ -11,16 +11,16 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const GenerateImposterWordInputSchema = z.object({
-  category: z.string().describe('The category for the imposter word.'),
+  category: z.string().describe('Die Kategorie für das Imposter-Wort.'),
   difficulty: z
     .enum(['easy', 'medium', 'hard'])
-    .describe('The difficulty level for the imposter word and hint.'),
+    .describe('Der Schwierigkeitsgrad für das Imposter-Wort und den Hinweis.'),
 });
 export type GenerateImposterWordInput = z.infer<typeof GenerateImposterWordInputSchema>;
 
 const GenerateImposterWordOutputSchema = z.object({
-  imposterWord: z.string().describe('The generated imposter word.'),
-  hint: z.string().optional().describe('A hint for the imposter word.'),
+  imposterWord: z.string().describe('Das generierte Imposter-Wort.'),
+  hint: z.string().optional().describe('Ein Hinweis für das Imposter-Wort.'),
 });
 export type GenerateImposterWordOutput = z.infer<typeof GenerateImposterWordOutputSchema>;
 
@@ -34,21 +34,21 @@ const prompt = ai.definePrompt({
   name: 'generateImposterWordPrompt',
   input: {schema: GenerateImposterWordInputSchema},
   output: {schema: GenerateImposterWordOutputSchema},
-  prompt: `You are an imposter word generator. You will generate an imposter word and a hint based on the category and difficulty level.
+  prompt: `Du bist ein Imposter-Wortgenerator. Du generierst ein Imposter-Wort und einen Hinweis basierend auf der Kategorie und dem Schwierigkeitsgrad. Die Wörter und Hinweise müssen auf Deutsch sein.
 
-Category: {{{category}}}
-Difficulty: {{{difficulty}}}
+Kategorie: {{{category}}}
+Schwierigkeitsgrad: {{{difficulty}}}
 
-Difficulty levels:
-- Easy: The imposter word is a common word related to the category, and the hint is a short definition or example of the word.
-- Medium: The imposter word is a less common word related to the category, and the hint is a more detailed definition or example of the word.
-- Hard: The imposter word is a rare or obscure word related to the category, and the hint is a cryptic clue or association.
+Schwierigkeitsgrade:
+- Leicht: Das Imposter-Wort ist ein gebräuchliches Wort, das mit der Kategorie zusammenhängt, und der Hinweis ist eine kurze Definition oder ein Beispiel für das Wort.
+- Mittel: Das Imposter-Wort ist ein weniger gebräuchliches Wort, das mit der Kategorie zusammenhängt, und der Hinweis ist eine detailliertere Definition oder ein Beispiel für das Wort.
+- Schwer: Das Imposter-Wort ist ein seltenes oder obskures Wort, das mit der Kategorie zusammenhängt, und der Hinweis ist ein kryptischer Anhaltspunkt oder eine Assoziation.
 
-Output the imposter word and the hint as a JSON object with the fields "imposterWord" and "hint". The hint field is optional and can be left blank.
+Gib das Imposter-Wort und den Hinweis als JSON-Objekt mit den Feldern "imposterWord" und "hint" aus. Das Feld "hint" ist optional und kann leer gelassen werden.
 
 {
-  "imposterWord": "<imposter_word>",
-  "hint": "<hint>"
+  "imposterWord": "<imposter_wort>",
+  "hint": "<hinweis>"
 }
 `,
 });

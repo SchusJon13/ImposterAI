@@ -5,7 +5,7 @@ import { generateImposterWord, type GenerateImposterWordInput, type GenerateImpo
 import { z } from "zod";
 
 const ImposterFormSchema = z.object({
-  category: z.string().min(2, 'Category must be at least 2 characters long.'),
+  category: z.string().min(2, 'Die Kategorie muss mindestens 2 Zeichen lang sein.'),
   difficulty: z.enum(['easy', 'medium', 'hard']),
 });
 
@@ -15,7 +15,7 @@ export async function getImposterWordAction(values: GenerateImposterWordInput): 
 }> {
   const validation = ImposterFormSchema.safeParse(values);
   if (!validation.success) {
-    return { data: null, error: 'Invalid input. Please check the form and try again.' };
+    return { data: null, error: 'Ungültige Eingabe. Bitte überprüfe das Formular und versuche es erneut.' };
   }
 
   try {
@@ -23,6 +23,6 @@ export async function getImposterWordAction(values: GenerateImposterWordInput): 
     return { data: result, error: null };
   } catch (error) {
     console.error("Error generating imposter word:", error);
-    return { data: null, error: "An unexpected error occurred while generating the word. Please try again later." };
+    return { data: null, error: "Beim Generieren des Wortes ist ein unerwarteter Fehler aufgetreten. Bitte versuche es später erneut." };
   }
 }

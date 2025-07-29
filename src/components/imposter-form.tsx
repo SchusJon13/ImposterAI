@@ -5,7 +5,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Smile, Meh, Frown, Wand2 } from "lucide-react";
+import { Loader2, Smile, Meh, Frown, Wand2, ArrowRight } from "lucide-react";
+import Link from 'next/link';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,24 +21,23 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { getImposterWordAction } from "@/app/actions";
 import type { GenerateImposterWordOutput } from "@/ai/flows/generate-imposter-word";
 
 const formSchema = z.object({
   category: z.string().min(2, {
-    message: "Category must be at least 2 characters.",
+    message: "Die Kategorie muss mindestens 2 Zeichen lang sein.",
   }),
   difficulty: z.enum(["easy", "medium", "hard"], {
-    required_error: "You need to select a difficulty level.",
+    required_error: "Du musst einen Schwierigkeitsgrad auswählen.",
   }),
 });
 
 const difficultyOptions = [
-  { value: "easy", label: "Easy", icon: Smile },
-  { value: "medium", label: "Medium", icon: Meh },
-  { value: "hard", label: "Hard", icon: Frown },
+  { value: "easy", label: "Leicht", icon: Smile },
+  { value: "medium", label: "Mittel", icon: Meh },
+  { value: "hard", label: "Schwer", icon: Frown },
 ] as const;
 
 export function ImposterForm() {
@@ -64,12 +64,52 @@ export function ImposterForm() {
     if (error) {
       toast({
         variant: "destructive",
-        title: "Something went wrong",
+        title: "Etwas ist schief gelaufen",
         description: error,
       });
     } else if (data) {
       setResult(data);
     }
+  }
+
+  const handleStartOver = () => {
+    setResult(null);
+    form.reset();
+  };
+
+  if (result) {
+    const gameUrl = `/play?word=${encodeURIComponent(result.imposterWord || '')}&hint=${encodeURIComponent(result.hint || '')}`;
+    return (
+      <div className="mt-10 animate-in fade-in-0 slide-in-from-bottom-5 duration-500 text-center">
+         <Card className="w-full max-w-2xl mx-auto shadow-2xl overflow-hidden">
+              <CardHeader className="text-center bg-primary/10 p-6">
+                  <CardTitle className="text-2xl font-bold font-headline text-accent">
+                      Spiel erstellt!
+                  </CardTitle>
+              </CardHeader>
+              <CardContent className="p-8 space-y-4">
+                  <p className="text-lg text-foreground">Dein Wort ist: <span className="font-bold text-primary">{result.imposterWord}</span></p>
+                  <p className="text-muted-foreground">Teile diesen Link mit den anderen Spielern:</p>
+                  <div className="flex items-center space-x-2">
+                    <Input value={`${window.location.origin}${gameUrl}`} readOnly className="text-center"/>
+                    <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}${gameUrl}`)}>Kopieren</Button>
+                  </div>
+              </CardContent>
+              <CardFooter className="flex-col gap-4 p-6 bg-muted/50">
+                <Link href={gameUrl} passHref>
+                  <Button asChild className="w-full">
+                    <a>
+                      Zum Spiel beitreten <ArrowRight className="ml-2 h-4 w-4" />
+                    </a>
+                  </Button>
+                </Link>
+                <Button variant="outline" onClick={handleStartOver} className="w-full">
+                  Neues Spiel starten
+                </Button>
+              </CardFooter>
+          </Card>
+      </div>
+    )
   }
 
   return (
@@ -83,9 +123,9 @@ export function ImposterForm() {
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg">Category</FormLabel>
+                    <FormLabel className="text-lg">Kategorie</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. Animals, Technology, History" {...field} className="text-base"/>
+                      <Input placeholder="z.B. Tiere, Technologie, Geschichte" {...field} className="text-base"/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -97,7 +137,7 @@ export function ImposterForm() {
                 name="difficulty"
                 render={({ field }) => (
                   <FormItem className="space-y-4">
-                    <FormLabel className="text-lg">Difficulty</FormLabel>
+                    <FormLabel className="text-lg">Schwierigkeitsgrad</FormLabel>
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
@@ -131,40 +171,12 @@ export function ImposterForm() {
                 ) : (
                   <Wand2 className="mr-2 h-6 w-6" />
                 )}
-                Generate Word
+                Wort generieren
               </Button>
             </form>
           </Form>
         </CardContent>
       </Card>
-      
-      {result && (
-        <div className="mt-10 animate-in fade-in-0 slide-in-from-bottom-5 duration-500">
-           <Card className="w-full max-w-2xl mx-auto shadow-2xl overflow-hidden">
-                <CardHeader className="text-center bg-primary/10 p-6">
-                    <CardTitle className="text-2xl font-bold font-headline text-accent">
-                        Here is your word!
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="text-center p-8">
-                    <p className="text-6xl font-extrabold text-primary tracking-wider uppercase drop-shadow-sm">
-                        {result.imposterWord}
-                    </p>
-                </CardContent>
-                {result.hint && (
-                    <>
-                        <Separator />
-                        <CardFooter className="flex-col items-start gap-2 p-6 bg-muted/50">
-                            <h3 className="text-sm font-bold tracking-wider uppercase text-muted-foreground">Hint</h3>
-                            <p className="text-base text-foreground/80 italic">
-                                {result.hint}
-                            </p>
-                        </CardFooter>
-                    </>
-                )}
-            </Card>
-        </div>
-      )}
     </>
   );
 }

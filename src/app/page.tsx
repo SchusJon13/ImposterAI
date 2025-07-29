@@ -9,7 +9,7 @@ export default function Home() {
             ImposterAI
           </h1>
           <p className="text-muted-foreground mt-3 text-lg max-w-lg mx-auto">
-            Give me a category and a difficulty, and I'll find the perfect imposter word for your game.
+            Gib mir eine Kategorie und einen Schwierigkeitsgrad, und ich finde das perfekte Imposter-Wort für dein Spiel.
           </p>
         </header>
         <ImposterForm />
