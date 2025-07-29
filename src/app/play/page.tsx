@@ -40,6 +40,8 @@ function PlayPageContent() {
     const [isCardFlipped, setIsCardFlipped] = useState(false);
     
     useEffect(() => {
+      // This logic needs to run only on the client side after hydration.
+      const loadGame = () => {
         try {
             const storedGameState = localStorage.getItem('imposter-game-state');
             if (!storedGameState) {
@@ -62,6 +64,12 @@ function PlayPageContent() {
             });
             router.push('/');
         }
+      };
+      
+      // Ensure this runs only client-side
+      if (typeof window !== 'undefined') {
+        loadGame();
+      }
     }, [router, toast]);
 
     const handleIdSubmit = (e: React.FormEvent) => {
@@ -178,7 +186,7 @@ function PlayPageContent() {
             <div className="w-full max-w-md mx-auto" style={{ perspective: '1000px' }}>
                 {!isCardFlipped ? (
                     <Card
-                        className="w-full h-96 rounded-2xl bg-primary text-primary-foreground flex flex-col items-center justify-between p-6 cursor-pointer shadow-2xl border-4 border-primary-foreground/20 transition-transform duration-500 hover:scale-105 hover:shadow-2xl"
+                        className="w-full h-96 rounded-2xl bg-primary text-primary-foreground flex flex-col items-center justify-between p-6 cursor-pointer shadow-2xl border-4 border-primary-foreground/20 transition-transform duration-500 hover:scale-105"
                         onClick={handleFlipCard}
                     >
                         <div className="w-full flex justify-start"><ShieldQuestion className="w-10 h-10 opacity-70" /></div>
