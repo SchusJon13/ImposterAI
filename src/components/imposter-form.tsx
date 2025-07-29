@@ -62,7 +62,6 @@ const modelOptions = [
 ] as const;
 
 export function ImposterForm() {
-  const [isLoading, setIsLoading] = useState(false);
   const [isGameReady, setIsGameReady] = useState(false);
   const [createdGameId, setCreatedGameId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -149,52 +148,61 @@ export function ImposterForm() {
     localStorage.setItem('imposter-players', JSON.stringify(updatedPlayers));
   };
   
-  const startGame = async (word: string, hint?: string) => {
-    setIsLoading(true);
+  // OPTIMISTIC UI: Show lobby immediately.
+  const startGame = (wordPromise: Promise<{word: string, hint?: string}>) => {
     if (!gameMasterId || players.length < 2) {
         toast({
             variant: "destructive",
             title: "Nicht genügend Spieler",
             description: "Du benötigst mindestens 2 Spieler (inkl. Spielleiter), um ein Spiel zu starten.",
         });
-        setIsLoading(false);
         return;
     }
-    
-    const { gameId, error } = await createGameInFirestore(players, gameMasterId, word, hint || '');
 
-    setIsLoading(false);
+    const newGameId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setCreatedGameId(newGameId);
+    setIsGameReady(true); // This renders the lobby UI immediately
 
-    if (error) {
-        toast({
+    // In the background, resolve the word and create the game in Firestore
+    wordPromise.then(async ({word, hint}) => {
+        const { error } = await createGameInFirestore(newGameId, players, gameMasterId, word, hint || '');
+
+        if (error) {
+            toast({
+                variant: "destructive",
+                title: "Fehler beim Erstellen des Spiels",
+                description: `Das Spiel konnte nicht in der Datenbank gespeichert werden: ${error}. Die Lobby ist möglicherweise nicht für andere sichtbar.`,
+            });
+            // Optionally, revert the UI state
+            // setIsGameReady(false);
+            // setCreatedGameId(null);
+        } else {
+             // Game created successfully in the background
+             // The UI is already showing the lobby, so nothing more to do here.
+        }
+    }).catch(error => {
+         toast({
             variant: "destructive",
-            title: "Fehler beim Erstellen des Spiels",
-            description: error,
+            title: "Fehler bei der Wortgenerierung",
+            description: `Die KI konnte kein Wort generieren: ${error}.`,
         });
-    } else {
-        setCreatedGameId(gameId);
-        setIsGameReady(true);
-    }
+    });
   };
 
   async function onAiSubmit(values: z.infer<typeof aiFormSchema>) {
-    setIsLoading(true);
-    const { data, error } = await getImposterWordAction(values);
-    setIsLoading(false);
-
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Etwas ist schief gelaufen",
-        description: error,
-      });
-    } else if (data) {
-      await startGame(data.imposterWord, data.hint);
-    }
+    const wordPromise = getImposterWordAction(values).then(result => {
+        const {data, error} = result;
+        if (error || !data) {
+          throw new Error(error || "Keine Daten von der KI erhalten.");
+        }
+        return { word: data.imposterWord, hint: data.hint };
+    });
+    startGame(wordPromise);
   }
 
   async function onDebugSubmit(values: z.infer<typeof debugFormSchema>) {
-      await startGame(values.imposterWord, values.hint);
+      const wordPromise = Promise.resolve({ word: values.imposterWord, hint: values.hint });
+      startGame(wordPromise);
   }
   
   const handleStartOver = () => {
@@ -310,134 +318,129 @@ export function ImposterForm() {
                   </TabsList>
               </CardHeader>
               <TabsContent value="ai">
-                  <CardContent>
-                      <Form {...aiForm}>
-                        <form onSubmit={aiForm.handleSubmit(onAiSubmit)} className="space-y-6">
-                          <FormField
-                            control={aiForm.control}
-                            name="category"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Kategorie</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="z.B. Tiere, Berufe, Länder" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                  <Form {...aiForm}>
+                    <form onSubmit={aiForm.handleSubmit(onAiSubmit)} className="space-y-6">
+                      <CardContent>
+                        <FormField
+                          control={aiForm.control}
+                          name="category"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Kategorie</FormLabel>
+                              <FormControl>
+                                <Input placeholder="z.B. Tiere, Berufe, Länder" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                          <FormField
-                            control={aiForm.control}
-                            name="difficulty"
-                            render={({ field }) => (
-                              <FormItem className="space-y-3">
-                                <FormLabel>Schwierigkeitsgrad</FormLabel>
-                                <FormControl>
-                                  <RadioGroup
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                    className="grid grid-cols-3 gap-2"
-                                  >
-                                    {difficultyOptions.map((option) => (
-                                      <FormItem key={option.value}>
-                                        <FormControl>
-                                          <RadioGroupItem value={option.value} id={option.value} className="sr-only peer" />
-                                        </FormControl>
-                                        <Label
-                                          htmlFor={option.value}
-                                          className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-colors"
-                                        >
-                                          <option.icon className="mb-2 h-6 w-6" />
-                                          {option.label}
-                                        </Label>
-                                      </FormItem>
-                                    ))}
-                                  </RadioGroup>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={aiForm.control}
-                            name="model"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="flex items-center gap-2"><Bot /> KI-Modell</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Wähle ein KI-Modell" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {modelOptions.map((option) => (
-                                      <SelectItem key={option.value} value={option.value}>
+                        <FormField
+                          control={aiForm.control}
+                          name="difficulty"
+                          render={({ field }) => (
+                            <FormItem className="space-y-3">
+                              <FormLabel>Schwierigkeitsgrad</FormLabel>
+                              <FormControl>
+                                <RadioGroup
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                  className="grid grid-cols-3 gap-2"
+                                >
+                                  {difficultyOptions.map((option) => (
+                                    <FormItem key={option.value}>
+                                      <FormControl>
+                                        <RadioGroupItem value={option.value} id={option.value} className="sr-only peer" />
+                                      </FormControl>
+                                      <Label
+                                        htmlFor={option.value}
+                                        className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-colors"
+                                      >
+                                        <option.icon className="mb-2 h-6 w-6" />
                                         {option.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                        </form>
-                      </Form>
-                  </CardContent>
-                  <CardFooter>
-                    <Button onClick={aiForm.handleSubmit(onAiSubmit)} disabled={isLoading} className="w-full" size="lg">
-                        {isLoading ? (
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        ) : (
-                          <Wand2 className="mr-2 h-5 w-5" />
-                        )}
-                        Wort generieren & Spiel starten
-                      </Button>
-                  </CardFooter>
+                                      </Label>
+                                    </FormItem>
+                                  ))}
+                                </RadioGroup>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={aiForm.control}
+                          name="model"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2"><Bot /> KI-Modell</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Wähle ein KI-Modell" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {modelOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </CardContent>
+                      <CardFooter>
+                        <Button type="submit" className="w-full" size="lg">
+                            <Wand2 className="mr-2 h-5 w-5" />
+                            Wort generieren & Spiel starten
+                        </Button>
+                      </CardFooter>
+                    </form>
+                  </Form>
               </TabsContent>
               <TabsContent value="debug">
-                   <CardContent>
-                      <Form {...debugForm}>
-                        <form onSubmit={debugForm.handleSubmit(onDebugSubmit)} className="space-y-6">
-                            <FormField
-                                control={debugForm.control}
-                                name="imposterWord"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Geheimes Wort</FormLabel>
-                                    <FormControl>
-                                    <Input placeholder="Das Wort, das alle Crewmates sehen" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={debugForm.control}
-                                name="hint"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Hinweis für den Imposter (optional)</FormLabel>
-                                    <FormControl>
-                                    <Textarea placeholder="Ein Hilfswort oder eine Phrase für den Imposter" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                        </form>
-                       </Form>
-                   </CardContent>
-                   <CardFooter>
-                        <Button onClick={debugForm.handleSubmit(onDebugSubmit)} disabled={isLoading} className="w-full" size="lg">
-                            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowRight className="mr-2 h-5 w-5" />}
-                            Manuelles Spiel starten
-                        </Button>
-                   </CardFooter>
+                   <Form {...debugForm}>
+                    <form onSubmit={debugForm.handleSubmit(onDebugSubmit)} className="space-y-6">
+                      <CardContent>
+                        <FormField
+                            control={debugForm.control}
+                            name="imposterWord"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Geheimes Wort</FormLabel>
+                                <FormControl>
+                                <Input placeholder="Das Wort, das alle Crewmates sehen" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                          <FormField
+                            control={debugForm.control}
+                            name="hint"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Hinweis für den Imposter (optional)</FormLabel>
+                                <FormControl>
+                                <Textarea placeholder="Ein Hilfswort oder eine Phrase für den Imposter" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                      </CardContent>
+                      <CardFooter>
+                          <Button type="submit" className="w-full" size="lg">
+                              <ArrowRight className="mr-2 h-5 w-5" />
+                              Manuelles Spiel starten
+                          </Button>
+                      </CardFooter>
+                    </form>
+                   </Form>
               </TabsContent>
           </Tabs>
         </Card>

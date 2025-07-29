@@ -1,3 +1,4 @@
+
 // src/lib/firebase.ts
 'use server';
 
@@ -20,22 +21,17 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
-function generateGameId() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
-
 export async function createGameInFirestore(
+    gameId: string, // Accept gameId as an argument
     players: Player[],
     gameMasterId: string,
     imposterWord: string,
     hint: string
-): Promise<{ gameId: string; error: string | null }> {
+): Promise<{ error: string | null }> {
     if (players.length < 2) {
-        return { gameId: '', error: 'Es werden mindestens 2 Spieler benötigt.' };
+        return { error: 'Es werden mindestens 2 Spieler benötigt.' };
     }
 
-    const gameId = generateGameId();
     const imposterIndex = Math.floor(Math.random() * players.length);
     const imposterId = players[imposterIndex].id;
     const startingPlayerIndex = Math.floor(Math.random() * players.length);
@@ -53,11 +49,11 @@ export async function createGameInFirestore(
 
     try {
         await setDoc(doc(db, "games", gameId), gameState);
-        return { gameId, error: null };
+        return { error: null };
     } catch (error) {
         console.error("Error creating game in Firestore:", error);
         const errorMessage = error instanceof Error ? error.message : "Unbekannter Fehler beim Erstellen des Spiels.";
-        return { gameId: '', error: errorMessage };
+        return { error: errorMessage };
     }
 }
 
@@ -87,3 +83,5 @@ export async function endGameInFirestore(gameId: string): Promise<{ success: boo
         return { success: false, error: "Fehler beim Beenden des Spiels." };
     }
 }
+
+    
