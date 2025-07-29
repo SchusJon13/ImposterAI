@@ -25,6 +25,11 @@ export async function getImposterWordAction(values: GenerateImposterWordInput): 
   } catch (error) {
     console.error("Error in getImposterWordAction:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    if (errorMessage.toLowerCase().includes('quota')) {
+        return { data: null, error: 'Dein API-Kontingent ist aufgebraucht. Bitte überprüfe dein Google AI Abo oder aktiviere die Abrechnung.' };
+    }
+
     return { data: null, error: `Beim Generieren des Wortes ist ein Fehler aufgetreten. (Details: ${errorMessage})` };
   }
 }

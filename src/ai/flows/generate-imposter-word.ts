@@ -52,11 +52,6 @@ Beispiel:
 - Mögliches Hilfswort: "Frucht"
 
 Gib das Imposter-Wort und das Hilfswort als JSON-Objekt mit den Feldern "imposterWord" und "hint" aus.
-
-{
-  "imposterWord": "<imposter_wort>",
-  "hint": "<hilfswort>"
-}
 `,
 });
 
