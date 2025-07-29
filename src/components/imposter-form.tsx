@@ -6,7 +6,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Loader2, Smile, Meh, Frown, Wand2, ArrowRight, UserPlus, Trash2, Copy, Users, Crown, Bot, PencilRuler } from "lucide-react";
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { Button } from "@/components/ui/button";
@@ -24,11 +23,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { getImposterWordAction } from "@/app/actions";
-import type { GenerateImposterWordOutput } from "@/ai/flows/generate-imposter-word";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { createGameInFirestore } from "@/lib/firebase";
+import type { Player } from '@/lib/types';
+
 
 const aiFormSchema = z.object({
   category: z.string().min(2, {
@@ -60,14 +61,10 @@ const modelOptions = [
     { value: "gemini-1.0-pro", label: "Gemini 1.0 Pro (Stabil)" },
 ] as const;
 
-interface Player {
-  id: string;
-  name: string;
-}
-
 export function ImposterForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGameReady, setIsGameReady] = useState(false);
+  const [createdGameId, setCreatedGameId] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -82,10 +79,8 @@ export function ImposterForm() {
   useEffect(() => {
     try {
       const savedPlayers = localStorage.getItem('imposter-players');
-      if (savedPlayers) {
-        setPlayers(JSON.parse(savedPlayers));
-      }
-      
+      const playersList = savedPlayers ? JSON.parse(savedPlayers) : [];
+
       let gmId = localStorage.getItem('imposter-gameMasterId');
       if (!gmId) {
         gmId = generateId();
@@ -93,13 +88,14 @@ export function ImposterForm() {
       }
       setGameMasterId(gmId);
       
-      const playersList = savedPlayers ? JSON.parse(savedPlayers) : [];
       const gameMasterPlayer = playersList.find((p: Player) => p.id === gmId);
       if (!gameMasterPlayer) {
           const gmPlayer: Player = { id: gmId, name: 'Spielleiter' };
           const updatedPlayers = [gmPlayer, ...playersList.filter((p: Player) => p.id !== gmId)];
           setPlayers(updatedPlayers);
           localStorage.setItem('imposter-players', JSON.stringify(updatedPlayers));
+      } else {
+        setPlayers(playersList);
       }
 
     } catch (e) {
@@ -153,49 +149,37 @@ export function ImposterForm() {
     localStorage.setItem('imposter-players', JSON.stringify(updatedPlayers));
   };
   
-  const createAndStoreGame = (word: string, hint?: string) => {
-      if (!gameMasterId || players.length < 2) {
-          toast({
-              variant: "destructive",
-              title: "Nicht genügend Spieler",
-              description: "Du benötigst mindestens 2 Spieler (inkl. Spielleiter), um ein Spiel zu starten.",
-          });
-          return;
-      }
-      
-      const imposterIndex = Math.floor(Math.random() * players.length);
-      const imposterId = players[imposterIndex].id;
+  const startGame = async (word: string, hint?: string) => {
+    setIsLoading(true);
+    if (!gameMasterId || players.length < 2) {
+        toast({
+            variant: "destructive",
+            title: "Nicht genügend Spieler",
+            description: "Du benötigst mindestens 2 Spieler (inkl. Spielleiter), um ein Spiel zu starten.",
+        });
+        setIsLoading(false);
+        return;
+    }
+    
+    const { gameId, error } = await createGameInFirestore(players, gameMasterId, word, hint || '');
 
-      const startingPlayerIndex = Math.floor(Math.random() * players.length);
-      const startingPlayerId = players[startingPlayerIndex].id;
+    setIsLoading(false);
 
-      const gameState = {
-          imposterWord: word,
-          hint: hint || '',
-          imposterId,
-          players: players.map(p => ({ id: p.id, name: p.name })),
-          gameMasterId,
-          startingPlayerId,
-          isGameOver: false,
-      };
-
-      try {
-          localStorage.setItem('imposter-game-state', JSON.stringify(gameState));
-          setIsGameReady(true);
-      } catch (e) {
-          toast({
-              variant: "destructive",
-              title: "Fehler beim Speichern des Spiels",
-              description: "Das Spiel konnte nicht im Browser gespeichert werden. Ist dein Speicher voll?",
-          });
-      }
+    if (error) {
+        toast({
+            variant: "destructive",
+            title: "Fehler beim Erstellen des Spiels",
+            description: error,
+        });
+    } else {
+        setCreatedGameId(gameId);
+        setIsGameReady(true);
+    }
   };
 
   async function onAiSubmit(values: z.infer<typeof aiFormSchema>) {
     setIsLoading(true);
-
     const { data, error } = await getImposterWordAction(values);
-
     setIsLoading(false);
 
     if (error) {
@@ -205,16 +189,17 @@ export function ImposterForm() {
         description: error,
       });
     } else if (data) {
-      createAndStoreGame(data.imposterWord, data.hint);
+      await startGame(data.imposterWord, data.hint);
     }
   }
 
-  function onDebugSubmit(values: z.infer<typeof debugFormSchema>) {
-      createAndStoreGame(values.imposterWord, values.hint);
+  async function onDebugSubmit(values: z.infer<typeof debugFormSchema>) {
+      await startGame(values.imposterWord, values.hint);
   }
   
   const handleStartOver = () => {
     setIsGameReady(false);
+    setCreatedGameId(null);
     aiForm.reset();
     debugForm.reset();
   };
@@ -227,17 +212,17 @@ export function ImposterForm() {
     });
   }
 
-  if (isGameReady) {
-    const gameUrl = `/play`;
+  if (isGameReady && createdGameId) {
+    const gameUrl = `/play?gameId=${createdGameId}`;
 
     return (
       <div className="mt-10 animate-in fade-in-0 slide-in-from-bottom-5 duration-500">
          <Card className="w-full max-w-2xl mx-auto shadow-2xl overflow-hidden">
               <CardHeader className="text-center bg-primary/10 p-6">
                   <CardTitle className="text-2xl font-bold font-headline text-accent">
-                      Spiel erstellt!
+                      Spiel erstellt! (ID: {createdGameId})
                   </CardTitle>
-                   <CardDescription>Das Spiel ist bereit. Teilt die IDs und den Link.</CardDescription>
+                   <CardDescription>Das Spiel ist bereit. Teilt die Spieler-IDs und den Link.</CardDescription>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
                   <p className="text-lg font-semibold text-foreground">1. Spieler-IDs teilen</p>
@@ -448,8 +433,8 @@ export function ImposterForm() {
                        </Form>
                    </CardContent>
                    <CardFooter>
-                        <Button onClick={debugForm.handleSubmit(onDebugSubmit)} className="w-full" size="lg">
-                            <ArrowRight className="mr-2 h-5 w-5" />
+                        <Button onClick={debugForm.handleSubmit(onDebugSubmit)} disabled={isLoading} className="w-full" size="lg">
+                            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowRight className="mr-2 h-5 w-5" />}
                             Manuelles Spiel starten
                         </Button>
                    </CardFooter>

@@ -1,83 +1,90 @@
-
 // src/app/play/page.tsx
 "use client";
 
-import { Suspense, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { getFirestore, doc, onSnapshot } from "firebase/firestore";
+import { getApp, getApps, initializeApp } from 'firebase/app';
+
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { UserCheck, Eye, Crown, Play, Swords, ShieldQuestion } from 'lucide-react';
+import { UserCheck, Eye, Crown, Play, Swords, ShieldQuestion, Loader2 } from 'lucide-react';
+import type { Player, GameState } from '@/lib/types';
+import { endGameInFirestore } from '@/lib/firebase';
 
-interface Player {
-    id: string;
-    name: string;
-}
+// This is a simplified client-side config.
+// The full config with server-side functions is in @/lib/firebase.ts
+const firebaseConfig = {
+  "projectId": "imposterai-5tsyj",
+  "appId": "1:1095581593715:web:024b764fa976bab71e3a06",
+  "storageBucket": "imposterai-5tsyj.firebasestorage.app",
+  "apiKey": "AIzaSyDMdXTt6dzXW4bzBlTDqHr7vyFOBmmq_-0",
+  "authDomain": "imposterai-5tsyj.firebaseapp.com",
+  "measurementId": "",
+  "messagingSenderId": "1095581593715"
+};
 
-interface GameState {
-    imposterWord: string;
-    hint: string;
-    imposterId: string;
-    players: Player[];
-    gameMasterId: string;
-    startingPlayerId: string;
-    isGameOver: boolean;
-}
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const db = getFirestore(app);
 
 function PlayPageContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { toast } = useToast();
 
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [playerIdInput, setPlayerIdInput] = useState('');
     const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
     const [isCardFlipped, setIsCardFlipped] = useState(false);
-    
-    useEffect(() => {
-      // This logic needs to run only on the client side after hydration.
-      const loadGame = () => {
-        try {
-            const storedGameState = localStorage.getItem('imposter-game-state');
-            if (!storedGameState) {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Fehler',
-                    description: 'Kein aktives Spiel gefunden. Bitte starte ein neues Spiel von der Hauptseite.',
-                });
-                router.push('/');
-                return;
-            }
-            const parsedState: GameState = JSON.parse(storedGameState);
-            setGameState(parsedState);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-        } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Fehler',
-                description: 'Spiel-Daten konnten nicht geladen werden. Bitte starte ein neues Spiel.',
-            });
-            router.push('/');
+    const gameId = searchParams.get('gameId');
+
+    useEffect(() => {
+        if (!gameId) {
+            setError('Keine Spiel-ID in der URL gefunden. Bitte benutze den Link vom Spielleiter.');
+            setLoading(false);
+            return;
         }
-      };
-      
-      // Ensure this runs only client-side
-      if (typeof window !== 'undefined') {
-        loadGame();
-      }
-    }, [router, toast]);
+
+        const gameDocRef = doc(db, 'games', gameId);
+
+        const unsubscribe = onSnapshot(gameDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setGameState(docSnap.data() as GameState);
+                setError(null);
+            } else {
+                setError('Spiel nicht gefunden. Überprüfe die Spiel-ID oder starte ein neues Spiel.');
+                setGameState(null);
+            }
+            setLoading(false);
+        }, (err) => {
+            console.error("Firebase onSnapshot error:", err);
+            setError('Fehler beim Verbinden mit dem Spiel. Bitte versuche es später erneut.');
+            setLoading(false);
+        });
+
+        // Cleanup the listener when the component unmounts
+        return () => unsubscribe();
+    }, [gameId]);
+
 
     const handleIdSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!gameState) return;
-        const foundPlayer = gameState.players.find(p => p.id.toLowerCase() === playerIdInput.toLowerCase());
+        
+        // Find player by case-insensitive matching
+        const foundPlayer = gameState.players.find(p => p.id.toLowerCase() === playerIdInput.trim().toLowerCase());
+        
         if (foundPlayer) {
             setCurrentPlayer(foundPlayer);
+            // Store player ID locally so they don't have to log in again if they refresh
+            localStorage.setItem(`imposter-last-player-${gameId}`, foundPlayer.id);
         } else {
             toast({
                 variant: "destructive",
@@ -86,41 +93,84 @@ function PlayPageContent() {
             });
         }
     };
+    
+    // Attempt to auto-login the player if they were here before
+    useEffect(() => {
+        if (gameState && gameId) {
+            const lastPlayerId = localStorage.getItem(`imposter-last-player-${gameId}`);
+            if (lastPlayerId) {
+                const foundPlayer = gameState.players.find(p => p.id === lastPlayerId);
+                if (foundPlayer) {
+                    setCurrentPlayer(foundPlayer);
+                }
+            }
+        }
+    }, [gameState, gameId]);
+
 
     const handleFlipCard = () => {
         setIsCardFlipped(true);
     };
     
-    const handleEndGame = () => {
-        if (!gameState) return;
-        const updatedGameState = { ...gameState, isGameOver: true };
-        setGameState(updatedGameState);
-        localStorage.setItem('imposter-game-state', JSON.stringify(updatedGameState));
+    const handleEndGame = async () => {
+        if (!gameId) return;
+        const { success, error } = await endGameInFirestore(gameId);
+        if (!success) {
+            toast({
+                variant: 'destructive',
+                title: 'Fehler',
+                description: error || 'Das Spiel konnte nicht beendet werden.',
+            });
+        }
     };
 
     const handleNewGame = () => {
-        localStorage.removeItem('imposter-game-state');
+        if (gameId) {
+            localStorage.removeItem(`imposter-last-player-${gameId}`);
+        }
         router.push('/');
     };
 
-    if (!gameState) {
+    if (loading) {
         return (
              <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-background">
-                <Card className="w-full max-w-sm shadow-xl">
+                <Card className="w-full max-w-sm shadow-xl text-center">
                     <CardHeader>
-                        <CardTitle className="text-center text-2xl">Lade Spiel...</CardTitle>
+                        <CardTitle className="text-2xl">Lade Spiel...</CardTitle>
                     </CardHeader>
+                    <CardContent>
+                        <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+                    </CardContent>
                 </Card>
             </main>
         )
     }
 
-    if (!currentPlayer) {
+    if (error) {
+         return (
+             <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-background">
+                <Card className="w-full max-w-sm shadow-xl text-center">
+                    <CardHeader>
+                        <CardTitle className="text-2xl text-destructive">Fehler</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p>{error}</p>
+                    </CardContent>
+                    <CardFooter>
+                        <Button className="w-full" onClick={() => router.push('/')}>Zurück zur Startseite</Button>
+                    </CardFooter>
+                </Card>
+            </main>
+        )
+    }
+
+    if (!currentPlayer || !gameState) {
         return (
             <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-background">
                 <Card className="w-full max-w-sm shadow-xl">
                     <CardHeader>
                         <CardTitle className="text-center text-2xl">Wer bist du?</CardTitle>
+                         <CardDescription className="text-center pt-2">Gib deine 6-stellige Spieler-ID ein, die du vom Spielleiter bekommen hast.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleIdSubmit} className="space-y-4">
@@ -130,9 +180,9 @@ function PlayPageContent() {
                                     id="playerId"
                                     value={playerIdInput}
                                     onChange={(e) => setPlayerIdInput(e.target.value)}
-                                    placeholder="6-stellige ID"
+                                    placeholder="z.B. AB12CD"
                                     maxLength={6}
-                                    className="text-center text-lg tracking-widest"
+                                    className="text-center text-lg tracking-widest font-mono"
                                     autoFocus
                                 />
                             </div>
@@ -243,7 +293,7 @@ function PlayPageContent() {
                                     <Swords className="mr-2" /> Spiel beenden & Wort aufdecken
                                 </Button>
                             )}
-                            <Button variant="secondary" onClick={() => { setCurrentPlayer(null); setIsCardFlipped(false); setPlayerIdInput(''); }}>
+                             <Button variant="secondary" onClick={() => { setCurrentPlayer(null); setIsCardFlipped(false); setPlayerIdInput(''); localStorage.removeItem(`imposter-last-player-${gameId}`); }}>
                                 Anderer Spieler
                             </Button>
                             <Button variant="outline" onClick={handleNewGame} className="w-full">
@@ -259,9 +309,7 @@ function PlayPageContent() {
 
 export default function PlayPage() {
   return (
-    // Suspense is not strictly needed here anymore since we are not using searchParams for initial state,
-    // but it's good practice to keep it for potential future async operations on page load.
-    <Suspense fallback={<div>Laden...</div>}>
+    <Suspense fallback={<main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></main>}>
       <PlayPageContent />
     </Suspense>
   )
