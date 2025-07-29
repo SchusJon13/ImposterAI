@@ -160,7 +160,7 @@ export function ImposterForm() {
                   <CardTitle className="text-2xl font-bold font-headline text-accent">
                       Spiel erstellt!
                   </CardTitle>
-                   <CardDescription>Das Wort ist: <span className="font-bold text-primary">{result.imposterWord}</span></CardDescription>
+                   <CardDescription>Das Spiel ist bereit. Teilt die IDs und den Link.</CardDescription>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
                   <p className="text-lg font-semibold text-foreground">1. Spieler-IDs teilen</p>
@@ -313,5 +313,3 @@ export function ImposterForm() {
     </>
   );
 }
-
-    
