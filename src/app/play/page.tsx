@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { UserCheck, Eye, Crown, Play, Swords } from 'lucide-react';
+import { UserCheck, Eye, Crown, Play, Swords, ShieldQuestion } from 'lucide-react';
 
 interface Player {
     id: string;
@@ -102,7 +102,7 @@ function PlayPageContent() {
     if (!currentPlayer) {
         return (
             <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-background">
-                <Card className="w-full max-w-sm">
+                <Card className="w-full max-w-sm shadow-xl">
                     <CardHeader>
                         <CardTitle className="text-center text-2xl">Wer bist du?</CardTitle>
                     </CardHeader>
@@ -143,7 +143,7 @@ function PlayPageContent() {
         const imposterPlayer = players.find(p => p.id === imposterId);
         return (
             <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-background">
-                <Card className="w-full max-w-md text-center animate-in fade-in-0 duration-700">
+                <Card className="w-full max-w-md text-center animate-in fade-in-0 duration-700 shadow-2xl">
                     <CardHeader>
                         <CardTitle className="text-3xl">Das Spiel ist vorbei!</CardTitle>
                     </CardHeader>
@@ -168,26 +168,27 @@ function PlayPageContent() {
 
     return (
         <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 bg-background">
-            <div className="w-full max-w-md mx-auto">
+            <div className="w-full max-w-md mx-auto" style={{ perspective: '1000px' }}>
                 {!isCardFlipped ? (
                     <Card
-                        className="w-full h-80 bg-primary text-primary-foreground flex flex-col items-center justify-center text-center p-6 cursor-pointer transform transition-transform duration-500 hover:scale-105"
+                        className="w-full h-96 rounded-2xl bg-primary text-primary-foreground flex flex-col items-center justify-between p-6 cursor-pointer shadow-2xl border-4 border-primary-foreground/20 transition-transform duration-500 hover:scale-105 hover:shadow-2xl"
                         onClick={handleFlipCard}
                     >
-                        <CardHeader>
+                        <div className="w-full flex justify-start"><ShieldQuestion className="w-10 h-10 opacity-70" /></div>
+                        
+                        <div className="text-center">
                             <CardTitle className="text-3xl font-bold">Hallo, {currentPlayer.name}!</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex justify-center items-center gap-4">
+                            <p className="text-lg mt-2 opacity-90">Klicke, um deine Rolle aufzudecken</p>
+                            <div className="flex justify-center items-center gap-4 mt-4">
                                 {isGameMaster && <Crown className="w-8 h-8 text-amber-300" title="Spielleiter" />}
                                 {isStartingPlayer && <Play className="w-8 h-8 text-green-300" title="Startspieler" />}
                             </div>
-                            <p className="text-lg mt-4">Klicke hier, um deine Rolle aufzudecken.</p>
-                            <Eye className="w-16 h-16 mt-4 opacity-80" />
-                        </CardContent>
+                        </div>
+
+                        <div className="w-full flex justify-end"><ShieldQuestion className="w-10 h-10 opacity-70 transform -scale-x-100" /></div>
                     </Card>
                 ) : (
-                    <Card className="w-full shadow-2xl overflow-hidden animate-in fade-in-0 duration-700">
+                    <Card className="w-full shadow-2xl overflow-hidden animate-in fade-in-0 duration-700 rounded-2xl border-4 border-primary-foreground/20">
                         <CardHeader className="text-center bg-accent/20 p-6">
                              <div className="flex justify-center items-center gap-4 mb-2">
                                 {isGameMaster && <Crown className="w-6 h-6 text-amber-500" title="Spielleiter" />}
@@ -198,14 +199,14 @@ function PlayPageContent() {
                                 {role}
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="text-center p-8 min-h-[12rem] flex flex-col justify-center">
+                        <CardContent className="text-center p-8 min-h-[14rem] flex flex-col justify-center">
                             <p className="text-muted-foreground mb-4">{roleDescription}</p>
                             
                             {isImposter && hint && (
                                 <>
                                     <Separator className="my-4"/>
-                                    <h3 className="text-sm font-bold tracking-wider uppercase text-muted-foreground">Dein Hinweis</h3>
-                                    <p className="text-2xl font-bold text-foreground/90 italic">
+                                    <h3 className="text-sm font-bold tracking-wider uppercase text-muted-foreground">Dein Hilfswort</h3>
+                                    <p className="text-3xl font-bold text-foreground/90 italic tracking-wide">
                                         {textToShow}
                                     </p>
                                 </>
@@ -214,7 +215,7 @@ function PlayPageContent() {
                                 <>
                                     <Separator className="my-4"/>
                                     <h3 className="text-sm font-bold tracking-wider uppercase text-muted-foreground">Das geheime Wort</h3>
-                                    <p className="text-4xl font-extrabold text-primary tracking-wider uppercase drop-shadow-sm break-words">
+                                    <p className="text-5xl font-extrabold text-primary tracking-wider uppercase drop-shadow-sm break-words">
                                         {textToShow}
                                     </p>
                                 </>
