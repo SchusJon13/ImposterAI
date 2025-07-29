@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Smile, Meh, Frown, Wand2, ArrowRight, UserPlus, Trash2, Copy, Users } from "lucide-react";
+import { Loader2, Smile, Meh, Frown, Wand2, ArrowRight, UserPlus, Trash2, Copy, Users, Crown } from "lucide-react";
 import Link from 'next/link';
 
 import { Button } from "@/components/ui/button";
@@ -54,12 +54,21 @@ export function ImposterForm() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [playerNameInput, setPlayerNameInput] = useState("");
   const [imposterId, setImposterId] = useState<string | null>(null);
+  const [gameMasterId, setGameMasterId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       const savedPlayers = localStorage.getItem('imposter-players');
       if (savedPlayers) {
         setPlayers(JSON.parse(savedPlayers));
+      }
+      const savedGameMasterId = localStorage.getItem('imposter-gameMasterId');
+      if (savedGameMasterId) {
+        setGameMasterId(savedGameMasterId);
+      } else {
+        const newGameMasterId = generateId();
+        setGameMasterId(newGameMasterId);
+        localStorage.setItem('imposter-gameMasterId', newGameMasterId);
       }
     } catch (e) {
       console.error("Could not load players from localStorage", e);
@@ -144,12 +153,17 @@ export function ImposterForm() {
     });
   }
 
-  if (result && imposterId) {
+  if (result && imposterId && gameMasterId) {
+    const startingPlayerIndex = Math.floor(Math.random() * players.length);
+    const startingPlayerId = players[startingPlayerIndex].id;
+
     const gameUrlParams = new URLSearchParams({
       word: result.imposterWord || '',
       hint: result.hint || '',
       imposterId: imposterId,
-      players: JSON.stringify(players.map(p => ({ id: p.id, name: p.name })))
+      players: JSON.stringify(players.map(p => ({ id: p.id, name: p.name }))),
+      gameMasterId: gameMasterId,
+      startingPlayerId: startingPlayerId,
     });
     const gameUrl = `/play?${gameUrlParams.toString()}`;
 
@@ -167,7 +181,7 @@ export function ImposterForm() {
                   <div className="space-y-2 rounded-md border p-2 max-h-48 overflow-y-auto">
                     {players.map(player => (
                         <div key={player.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
-                            <span className="font-medium">{player.name}</span>
+                            <span className="font-medium">{player.name} {player.id === gameMasterId && <Crown className="inline-block w-4 h-4 ml-1 text-amber-500" />}</span>
                             <div className="flex items-center gap-2">
                                 <Badge variant="secondary" className="font-mono text-base">{player.id}</Badge>
                                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyToClipboard(player.id, 'ID')}>
@@ -211,7 +225,7 @@ export function ImposterForm() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Users /> Mitspieler</CardTitle>
-            <CardDescription>Füge Spieler hinzu oder entferne sie. Ihre IDs werden gespeichert.</CardDescription>
+            <CardDescription>Füge Spieler hinzu oder entferne sie. Deine ID als Spielleiter ist mit einer Krone markiert.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-2 mb-4">
@@ -228,7 +242,7 @@ export function ImposterForm() {
               {players.map(player => (
                 <div key={player.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md animate-in fade-in-0">
                   <div>
-                    <p className="font-medium">{player.name}</p>
+                    <p className="font-medium">{player.name} {player.id === gameMasterId && <Crown className="inline-block w-4 h-4 ml-1 text-amber-500" />}</p>
                     <p className="text-xs font-mono text-muted-foreground">{player.id}</p>
                   </div>
                   <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive h-8 w-8" onClick={() => handleRemovePlayer(player.id)}>
