@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Smile, Meh, Frown, Wand2, ArrowRight } from "lucide-react";
+import { Loader2, Smile, Meh, Frown, Wand2, ArrowRight, UserPlus, Trash2, Copy, Users } from "lucide-react";
 import Link from 'next/link';
 
 import { Button } from "@/components/ui/button";
@@ -20,10 +20,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { getImposterWordAction } from "@/app/actions";
 import type { GenerateImposterWordOutput } from "@/ai/flows/generate-imposter-word";
+import { Badge } from "@/components/ui/badge";
 
 const formSchema = z.object({
   category: z.string().min(2, {
@@ -40,10 +41,30 @@ const difficultyOptions = [
   { value: "hard", label: "Schwer", icon: Frown },
 ] as const;
 
+interface Player {
+  id: string;
+  name: string;
+}
+
 export function ImposterForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<GenerateImposterWordOutput | null>(null);
   const { toast } = useToast();
+
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [playerNameInput, setPlayerNameInput] = useState("");
+  const [imposterId, setImposterId] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const savedPlayers = localStorage.getItem('imposter-players');
+      if (savedPlayers) {
+        setPlayers(JSON.parse(savedPlayers));
+      }
+    } catch (e) {
+      console.error("Could not load players from localStorage", e);
+    }
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -53,9 +74,43 @@ export function ImposterForm() {
     },
   });
 
+  const generateId = () => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  };
+
+  const handleAddPlayer = () => {
+    if (playerNameInput.trim() === "") return;
+    
+    let player = players.find(p => p.name.toLowerCase() === playerNameInput.trim().toLowerCase());
+    
+    if (!player) {
+      player = { name: playerNameInput.trim(), id: generateId() };
+      const updatedPlayers = [...players, player];
+      setPlayers(updatedPlayers);
+      localStorage.setItem('imposter-players', JSON.stringify(updatedPlayers));
+    }
+    
+    setPlayerNameInput("");
+  };
+
+  const handleRemovePlayer = (id: string) => {
+    const updatedPlayers = players.filter(p => p.id !== id);
+    setPlayers(updatedPlayers);
+    localStorage.setItem('imposter-players', JSON.stringify(updatedPlayers));
+  };
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (players.length < 2) {
+      toast({
+        variant: "destructive",
+        title: "Nicht genügend Spieler",
+        description: "Du benötigst mindestens 2 Spieler, um ein Spiel zu starten.",
+      });
+      return;
+    }
     setIsLoading(true);
     setResult(null);
+    setImposterId(null);
 
     const { data, error } = await getImposterWordAction(values);
 
@@ -69,34 +124,71 @@ export function ImposterForm() {
       });
     } else if (data) {
       setResult(data);
+      // Select a random imposter
+      const randomPlayerIndex = Math.floor(Math.random() * players.length);
+      setImposterId(players[randomPlayerIndex].id);
     }
   }
-
+  
   const handleStartOver = () => {
     setResult(null);
+    setImposterId(null);
     form.reset();
   };
 
-  if (result) {
-    const gameUrl = `/play?word=${encodeURIComponent(result.imposterWord || '')}&hint=${encodeURIComponent(result.hint || '')}`;
+  const copyToClipboard = (text: string, type: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: `${type} kopiert!`,
+      description: `Der Text wurde in deine Zwischenablage kopiert.`,
+    });
+  }
+
+  if (result && imposterId) {
+    const gameUrlParams = new URLSearchParams({
+      word: result.imposterWord || '',
+      hint: result.hint || '',
+      imposterId: imposterId,
+      players: JSON.stringify(players.map(p => ({ id: p.id, name: p.name })))
+    });
+    const gameUrl = `/play?${gameUrlParams.toString()}`;
+
     return (
-      <div className="mt-10 animate-in fade-in-0 slide-in-from-bottom-5 duration-500 text-center">
+      <div className="mt-10 animate-in fade-in-0 slide-in-from-bottom-5 duration-500">
          <Card className="w-full max-w-2xl mx-auto shadow-2xl overflow-hidden">
               <CardHeader className="text-center bg-primary/10 p-6">
                   <CardTitle className="text-2xl font-bold font-headline text-accent">
                       Spiel erstellt!
                   </CardTitle>
+                   <CardDescription>Das Wort ist: <span className="font-bold text-primary">{result.imposterWord}</span></CardDescription>
               </CardHeader>
-              <CardContent className="p-8 space-y-4">
-                  <p className="text-lg text-foreground">Dein Wort ist: <span className="font-bold text-primary">{result.imposterWord}</span></p>
-                  <p className="text-muted-foreground">Teile diesen Link mit den anderen Spielern:</p>
+              <CardContent className="p-6 space-y-4">
+                  <p className="text-lg font-semibold text-foreground">1. Spieler-IDs teilen</p>
+                  <div className="space-y-2 rounded-md border p-2 max-h-48 overflow-y-auto">
+                    {players.map(player => (
+                        <div key={player.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                            <span className="font-medium">{player.name}</span>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="font-mono text-base">{player.id}</Badge>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyToClipboard(player.id, 'ID')}>
+                                    <Copy className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    ))}
+                  </div>
+
+                  <p className="text-lg font-semibold text-foreground pt-4">2. Link teilen</p>
+                  <p className="text-muted-foreground">Jeder Spieler muss seine ID auf der Spielseite eingeben.</p>
                   <div className="flex items-center space-x-2">
-                    <Input value={`${window.location.origin}${gameUrl}`} readOnly className="text-center"/>
-                    <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}${gameUrl}`)}>Kopieren</Button>
+                    <Input value={`${window.location.origin}${gameUrl}`} readOnly className="text-sm"/>
+                    <Button onClick={() => copyToClipboard(`${window.location.origin}${gameUrl}`, 'Link')}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
                   </div>
               </CardContent>
               <CardFooter className="flex-col gap-4 p-6 bg-muted/50">
-                <Link href={gameUrl} passHref>
+                <Link href={gameUrl} passHref className="w-full">
                   <Button asChild className="w-full">
                     <a>
                       Zum Spiel beitreten <ArrowRight className="ml-2 h-4 w-4" />
@@ -114,69 +206,112 @@ export function ImposterForm() {
 
   return (
     <>
-      <Card>
-        <CardContent className="p-6">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg">Kategorie</FormLabel>
-                    <FormControl>
-                      <Input placeholder="z.B. Tiere, Technologie, Geschichte" {...field} className="text-base"/>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Player Management Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Users /> Mitspieler</CardTitle>
+            <CardDescription>Füge Spieler hinzu oder entferne sie. Ihre IDs werden gespeichert.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-2 mb-4">
+              <Input 
+                placeholder="Name des Spielers" 
+                value={playerNameInput}
+                onChange={(e) => setPlayerNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
               />
+              <Button onClick={handleAddPlayer}><UserPlus /></Button>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {players.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Noch keine Spieler hinzugefügt.</p>}
+              {players.map(player => (
+                <div key={player.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md animate-in fade-in-0">
+                  <div>
+                    <p className="font-medium">{player.name}</p>
+                    <p className="text-xs font-mono text-muted-foreground">{player.id}</p>
+                  </div>
+                  <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive h-8 w-8" onClick={() => handleRemovePlayer(player.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-              <FormField
-                control={form.control}
-                name="difficulty"
-                render={({ field }) => (
-                  <FormItem className="space-y-4">
-                    <FormLabel className="text-lg">Schwierigkeitsgrad</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="grid grid-cols-1 sm:grid-cols-3 gap-4"
-                      >
-                        {difficultyOptions.map((option) => (
-                           <FormItem key={option.value}>
-                             <FormControl>
-                               <RadioGroupItem value={option.value} id={option.value} className="sr-only peer" />
-                             </FormControl>
-                             <Label
-                              htmlFor={option.value}
-                              className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-colors"
-                            >
-                               <option.icon className="mb-3 h-7 w-7" />
-                               {option.label}
-                             </Label>
-                           </FormItem>
-                        ))}
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        {/* Game Settings Card */}
+        <Card>
+          <CardHeader>
+              <CardTitle>Spieleinstellungen</CardTitle>
+              <CardDescription>Wähle eine Kategorie und einen Schwierigkeitsgrad.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Kategorie</FormLabel>
+                      <FormControl>
+                        <Input placeholder="z.B. Tiere, Berufe, Länder" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <Button type="submit" disabled={isLoading} className="w-full text-lg py-6">
+                <FormField
+                  control={form.control}
+                  name="difficulty"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Schwierigkeitsgrad</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="grid grid-cols-3 gap-2"
+                        >
+                          {difficultyOptions.map((option) => (
+                            <FormItem key={option.value}>
+                              <FormControl>
+                                <RadioGroupItem value={option.value} id={option.value} className="sr-only peer" />
+                              </FormControl>
+                              <Label
+                                htmlFor={option.value}
+                                className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-colors"
+                              >
+                                <option.icon className="mb-2 h-6 w-6" />
+                                {option.label}
+                              </Label>
+                            </FormItem>
+                          ))}
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </form>
+            </Form>
+          </CardContent>
+           <CardFooter>
+             <Button onClick={form.handleSubmit(onSubmit)} disabled={isLoading} className="w-full text-lg py-6">
                 {isLoading ? (
                   <Loader2 className="mr-2 h-6 w-6 animate-spin" />
                 ) : (
                   <Wand2 className="mr-2 h-6 w-6" />
                 )}
-                Wort generieren
+                Wort generieren & Spiel starten
               </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+           </CardFooter>
+        </Card>
+      </div>
     </>
   );
 }
+
+    
