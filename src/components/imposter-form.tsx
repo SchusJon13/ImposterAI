@@ -56,22 +56,36 @@ export function ImposterForm() {
   const [imposterId, setImposterId] = useState<string | null>(null);
   const [gameMasterId, setGameMasterId] = useState<string | null>(null);
 
+  const generateId = () => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  };
+
   useEffect(() => {
     try {
       const savedPlayers = localStorage.getItem('imposter-players');
       if (savedPlayers) {
         setPlayers(JSON.parse(savedPlayers));
       }
-      const savedGameMasterId = localStorage.getItem('imposter-gameMasterId');
-      if (savedGameMasterId) {
-        setGameMasterId(savedGameMasterId);
-      } else {
-        const newGameMasterId = generateId();
-        setGameMasterId(newGameMasterId);
-        localStorage.setItem('imposter-gameMasterId', newGameMasterId);
+      
+      let gmId = localStorage.getItem('imposter-gameMasterId');
+      if (!gmId) {
+        gmId = generateId();
+        localStorage.setItem('imposter-gameMasterId', gmId);
       }
+      setGameMasterId(gmId);
+      
+      // Add the Game Master to the players list if not already there
+      const playersList = savedPlayers ? JSON.parse(savedPlayers) : [];
+      const gameMasterPlayer = playersList.find((p: Player) => p.id === gmId);
+      if (!gameMasterPlayer) {
+          const gmPlayer: Player = { id: gmId, name: 'Spielleiter' };
+          const updatedPlayers = [gmPlayer, ...playersList.filter((p: Player) => p.id !== gmId)];
+          setPlayers(updatedPlayers);
+          localStorage.setItem('imposter-players', JSON.stringify(updatedPlayers));
+      }
+
     } catch (e) {
-      console.error("Could not load players from localStorage", e);
+      console.error("Could not load from localStorage", e);
     }
   }, []);
 
@@ -82,10 +96,6 @@ export function ImposterForm() {
       difficulty: "medium",
     },
   });
-
-  const generateId = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
-  };
 
   const handleAddPlayer = () => {
     if (playerNameInput.trim() === "") return;
@@ -103,6 +113,14 @@ export function ImposterForm() {
   };
 
   const handleRemovePlayer = (id: string) => {
+    if (id === gameMasterId) {
+      toast({
+        variant: "destructive",
+        title: "Spielleiter kann nicht entfernt werden.",
+        description: "Du bist der Spielleiter dieser Runde.",
+      });
+      return;
+    }
     const updatedPlayers = players.filter(p => p.id !== id);
     setPlayers(updatedPlayers);
     localStorage.setItem('imposter-players', JSON.stringify(updatedPlayers));
@@ -225,7 +243,7 @@ export function ImposterForm() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Users /> Mitspieler</CardTitle>
-            <CardDescription>Füge Spieler hinzu oder entferne sie. Deine ID als Spielleiter ist mit einer Krone markiert.</CardDescription>
+            <CardDescription>Du bist der Spielleiter (gekennzeichnet mit einer Krone). Füge weitere Spieler hinzu oder entferne sie.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-2 mb-4">
@@ -327,3 +345,5 @@ export function ImposterForm() {
     </>
   );
 }
+
+    
